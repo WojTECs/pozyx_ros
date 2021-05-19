@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<launch>
+    <node pkg="pozyx_ros" type="test_node" name="test_node" output="screen">
+        <rosparam file="$(find pozyx_ros)/cfg/anchors.yaml" command="load" ns="" />
+        
+    </node>
+</launch>
