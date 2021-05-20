@@ -28,8 +28,22 @@ class PozyxDriver:
         pos_msg = PoseWithCovarianceStamped()
         pos_msg.header.frame_id = "pozyx"
 
-        pos_msg.pose.covariance[2] = -1
+        cov_index_pos_x = 0
+        cov_index_pos_y = 7
+        cov_index_pos_z = 14
+
+        cov_index_ang_x = 21
+        cov_index_ang_y = 28
+        cov_index_ang_z = 35
+
+        pos_msg.pose.covariance[cov_index_pos_z] = -1
         pos_msg.pose.pose.position.z = 0.0
+
+        pos_msg.pose.covariance[cov_index_ang_x] = 0.0001
+        pos_msg.pose.covariance[cov_index_ang_y] = 0.0001
+        pos_msg.pose.covariance[cov_index_ang_z] = 0.0001
+
+
         pos_error = pypozyx.PositionError()
         pos = pypozyx.Coordinates()
         quat = pypozyx.Quaternion()
@@ -45,15 +59,15 @@ class PozyxDriver:
             pos_msg.pose.pose.position.x = (pos.x/1000.0)  # [m]
             pos_msg.pose.pose.position.y = (pos.y/1000.0)  # [m]
 
-            pos_msg.pose.covariance[0] = (pos_error.x/1000.0)  # [m]
-            pos_msg.pose.covariance[1] = (pos_error.y/1000.0)  # [m]
+            pos_msg.pose.covariance[cov_index_pos_x] = (pos_error.x/1000.0)  # [m]
+            pos_msg.pose.covariance[cov_index_pos_y] = (pos_error.y/1000.0)  # [m]
 
             pos_msg.pose.pose.orientation.x = quat.x
             pos_msg.pose.pose.orientation.y = quat.y
             pos_msg.pose.pose.orientation.z = quat.z
             pos_msg.pose.pose.orientation.w = quat.w
             pos_msg.header.stamp = rospy.Time.now()
-            
+
             self.pose_pub.publish(pos_msg)
 
             time.sleep(0.02)
@@ -76,9 +90,9 @@ class PozyxDriver:
         else:
             for key, value in rospy.get_param('~anchors').items():
                 # print(key, value["pos"])
-                anchors.append(pypozyx.DeviceCoordinates(key, 1, pypozyx.Coordinates(value["pos"][0],
-                                                                                     value["pos"][1],
-                                                                                     value["pos"][2])))
+                anchors.append(pypozyx.DeviceCoordinates(int(key, 16), 1, pypozyx.Coordinates(value["pos"][0],
+                                                                                              value["pos"][1],
+                                                                                              value["pos"][2])))
 
         settings_registers = [0x16, 0x17]  # POS ALG and NUM ANCHORS
 
