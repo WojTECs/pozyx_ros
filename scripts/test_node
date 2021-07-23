@@ -7,4 +7,6 @@ from pozyx_ros import PozyxDriver
 rospy.init_node("pozyx_test")
 
 p = PozyxDriver()
+p.set_anchor_configuration()
+p.set_algorithm_configuration()
 p.start_localization()
