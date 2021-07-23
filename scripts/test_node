@@ -1,0 +1,10 @@
+#!/usr/bin/env python3
+import rospy
+import pypozyx
+import time
+from pozyx_ros import PozyxDriver
+
+rospy.init_node("pozyx_test")
+
+p = PozyxDriver()
+p.start_localization()
