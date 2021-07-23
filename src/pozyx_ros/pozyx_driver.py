@@ -43,24 +43,27 @@ class PozyxDriver:
         pos_msg.pose.covariance[cov_index_ang_y] = 0.0001
         pos_msg.pose.covariance[cov_index_ang_z] = 0.0001
 
-
         pos_error = pypozyx.PositionError()
         pos = pypozyx.Coordinates()
         quat = pypozyx.Quaternion()
-        # print(
+        rate_hz = rospy.get_param("~rate",50)
+        self.rate = rospy.Rate(rate_hz)
         while not rospy.is_shutdown():
-            # print(pypozyx.PozyxRegisters.POSITIONING_ERROR_X)
-            # pypozyx.PositioningData.
-
-            self.pozyx.getPositionError(pos_error)
             self.pozyx.doPositioning(pos)
-            self.pozyx.getQuaternion(quat)
 
             pos_msg.pose.pose.position.x = (pos.x/1000.0)  # [m]
             pos_msg.pose.pose.position.y = (pos.y/1000.0)  # [m]
 
-            pos_msg.pose.covariance[cov_index_pos_x] = (pos_error.x/1000.0)  # [m]
-            pos_msg.pose.covariance[cov_index_pos_y] = (pos_error.y/1000.0)  # [m]
+            if self.pozyx.getPositionError(pos_error) == pypozyx.POZYX_SUCCESS:
+                pos_msg.pose.covariance[cov_index_pos_x] = (
+                    pos_error.x/1000.0)  # [m]
+                pos_msg.pose.covariance[cov_index_pos_y] = (
+                    pos_error.y/1000.0)  # [m]
+            else:
+                pos_msg.pose.covariance[cov_index_pos_x] = 1  # [m]
+                pos_msg.pose.covariance[cov_index_pos_y] = 1  # [m]
+
+            self.pozyx.getQuaternion(quat)
 
             pos_msg.pose.pose.orientation.x = quat.x
             pos_msg.pose.pose.orientation.y = quat.y
@@ -69,8 +72,7 @@ class PozyxDriver:
             pos_msg.header.stamp = rospy.Time.now()
 
             self.pose_pub.publish(pos_msg)
-
-            time.sleep(0.02)
+            self.rate.sleep()
 
     def set_algorithm_configuration(self):
         alg = pypozyx.PozyxConstants.POSITIONING_ALGORITHM_TRACKING
