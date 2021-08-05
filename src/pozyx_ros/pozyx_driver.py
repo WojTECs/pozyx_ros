@@ -19,7 +19,7 @@ class PozyxDriver:
             rospy.loginfo("[POZYX]: No Pozyx port was found")
             exit(0)
         self.pose_pub = rospy.Publisher(
-            "poyzx_pose", PoseWithCovarianceStamped, queue_size=10)
+            "pozyx_pose", PoseWithCovarianceStamped, queue_size=10)
 
     def get_imu_covariance(self):
         pass

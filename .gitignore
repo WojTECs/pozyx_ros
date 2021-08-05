@@ -1,1 +1,3 @@
 src/pozyx_ros/__pycache__
+*.pyc
+.vscode
