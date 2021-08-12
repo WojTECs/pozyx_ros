@@ -3,6 +3,7 @@ import pypozyx
 import rospy
 import time
 from geometry_msgs.msg import PoseWithCovarianceStamped
+from sensor_msgs.msg import Imu
 
 
 class PozyxDriver:
@@ -20,59 +21,103 @@ class PozyxDriver:
             exit(0)
         self.pose_pub = rospy.Publisher(
             "pozyx_pose", PoseWithCovarianceStamped, queue_size=10)
+        self.imu_pub = rospy.Publisher("pozyx_imu", Imu, queue_size=1)
+
+        self.acceleration = pypozyx.Acceleration()
+        self.angular_velocity = pypozyx.AngularVelocity()
+        self.quaternion = pypozyx.Quaternion()
+        self.imu_msg = Imu()
+        self.imu_msg.header.frame_id = "pozyx"
+        self.pos_msg = PoseWithCovarianceStamped()
+        self.pos_msg.header.frame_id = "pozyx"
+
+        self.__cov_index_pos_x = 0
+        self.__cov_index_pos_y = 7
+        self.__cov_index_pos_z = 14
+        self.__cov_index_ang_x = 21
+        self.__cov_index_ang_y = 28
+        self.__cov_index_ang_z = 35
+
+        self.pos_msg.pose.covariance[self.__cov_index_pos_z] = -1
+        self.pos_msg.pose.pose.position.z = 0.0
+
+        self.pos_msg.pose.covariance[self.__cov_index_ang_x] = 0.001
+        self.pos_msg.pose.covariance[self.__cov_index_ang_y] = 0.001
+        self.pos_msg.pose.covariance[self.__cov_index_ang_z] = 0.001
+
+        self.imu_msg.orientation_covariance = [0.001, 0, 0,
+                                               0, 0.001, 0,
+                                               0, 0, 0.001]
+
+        self.imu_msg.angular_velocity_covariance = [0.001, 0, 0,
+                                                    0, 0.001, 0,
+                                                    0, 0, 0.001]
+
+        self.imu_msg.linear_acceleration_covariance = [0.001, 0, 0,
+                                                       0, 0.001, 0,
+                                                       0, 0, 0.001]
 
     def get_imu_covariance(self):
         pass
 
+    def get_imu_data(self):
+        self.pozyx.getAngularVelocity_dps(self.angular_velocity)
+        self.pozyx.getAcceleration_mg(self.acceleration)
+        self.pozyx.getQuaternion(self.quaternion)
+
+        self.imu_msg.orientation.x = self.quaternion.x
+        self.imu_msg.orientation.y = self.quaternion.y
+        self.imu_msg.orientation.z = self.quaternion.z
+        self.imu_msg.orientation.w = self.quaternion.w
+
+        self.imu_msg.angular_velocity.x = self.angular_velocity.x * 0.0174532925
+        self.imu_msg.angular_velocity.y = self.angular_velocity.y * 0.0174532925
+        self.imu_msg.angular_velocity.z = self.angular_velocity.z * 0.0174532925
+
+        self.imu_msg.linear_acceleration.x = self.acceleration.x * 0.00980665
+        self.imu_msg.linear_acceleration.y = self.acceleration.y * 0.00980665
+        self.imu_msg.linear_acceleration.z = self.acceleration.z * 0.00980665
+
+        pass
+
     def start_localization(self):
-        pos_msg = PoseWithCovarianceStamped()
-        pos_msg.header.frame_id = "pozyx"
-
-        cov_index_pos_x = 0
-        cov_index_pos_y = 7
-        cov_index_pos_z = 14
-
-        cov_index_ang_x = 21
-        cov_index_ang_y = 28
-        cov_index_ang_z = 35
-
-        pos_msg.pose.covariance[cov_index_pos_z] = -1
-        pos_msg.pose.pose.position.z = 0.0
-
-        pos_msg.pose.covariance[cov_index_ang_x] = 0.0001
-        pos_msg.pose.covariance[cov_index_ang_y] = 0.0001
-        pos_msg.pose.covariance[cov_index_ang_z] = 0.0001
 
         pos_error = pypozyx.PositionError()
         pos = pypozyx.Coordinates()
-        quat = pypozyx.Quaternion()
-        rate_hz = rospy.get_param("~rate",50)
+        rate_hz = rospy.get_param("~rate", 50)
         self.rate = rospy.Rate(rate_hz)
+        # print( "{0}\t {1}\t {2}\t".format(acc.x * 0.00980665 ,acc.y * 0.00980665, acc.z * 0.00980665))
+        # print( "{0}\t {1}\t {2}\t".format(ang.x*0.0174532925,ang.y*0.0174532925,ang.z*0.0174532925))
+
         while not rospy.is_shutdown():
             self.pozyx.doPositioning(pos)
 
-            pos_msg.pose.pose.position.x = (pos.x/1000.0)  # [m]
-            pos_msg.pose.pose.position.y = (pos.y/1000.0)  # [m]
+            self.pos_msg.pose.pose.position.x = (pos.x/1000.0)  # [m]
+            self.pos_msg.pose.pose.position.y = (pos.y/1000.0)  # [m]
 
             if self.pozyx.getPositionError(pos_error) == pypozyx.POZYX_SUCCESS:
-                pos_msg.pose.covariance[cov_index_pos_x] = (
+                self.pos_msg.pose.covariance[self.__cov_index_pos_x] = (
                     pos_error.x/1000.0)  # [m]
-                pos_msg.pose.covariance[cov_index_pos_y] = (
+                self.pos_msg.pose.covariance[self.__cov_index_pos_y] = (
                     pos_error.y/1000.0)  # [m]
             else:
-                pos_msg.pose.covariance[cov_index_pos_x] = 1  # [m]
-                pos_msg.pose.covariance[cov_index_pos_y] = 1  # [m]
+                self.pos_msg.pose.covariance[self.__cov_index_pos_x] = 1  # [m]
+                self.pos_msg.pose.covariance[self.__cov_index_pos_y] = 1  # [m]
 
-            self.pozyx.getQuaternion(quat)
+            # self.pozyx.getQuaternion(self.quaternion)
+            self.get_imu_data()
 
-            pos_msg.pose.pose.orientation.x = quat.x
-            pos_msg.pose.pose.orientation.y = quat.y
-            pos_msg.pose.pose.orientation.z = quat.z
-            pos_msg.pose.pose.orientation.w = quat.w
-            pos_msg.header.stamp = rospy.Time.now()
+            self.pos_msg.pose.pose.orientation.x = self.quaternion.x
+            self.pos_msg.pose.pose.orientation.y = self.quaternion.y
+            self.pos_msg.pose.pose.orientation.z = self.quaternion.z
+            self.pos_msg.pose.pose.orientation.w = self.quaternion.w
+            self.pos_msg.header.stamp = rospy.Time.now()
+            self.imu_msg.header.stamp = rospy.Time.now()
 
-            self.pose_pub.publish(pos_msg)
-            self.rate.sleep()
+            self.pose_pub.publish(self.pos_msg)
+            self.imu_pub.publish(self.imu_msg)
+
+            # self.rate.sleep()
 
     def set_algorithm_configuration(self):
         alg = pypozyx.PozyxConstants.POSITIONING_ALGORITHM_TRACKING
